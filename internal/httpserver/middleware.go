@@ -91,6 +91,13 @@ func SearchThrottle(_ *templates.Renderer) func(http.Handler) http.Handler {
 	}
 }
 
+func addHeaderNoSniff(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("X-Content-Type-Options", "nosniff")
+		next.ServeHTTP(w, r)
+	})
+}
+
 type rateLimitCounter struct {
 	count   int
 	resetAt time.Time

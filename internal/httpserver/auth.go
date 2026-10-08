@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -233,6 +234,17 @@ func parseForm(_ int64, renderer *templates.Renderer) middleware {
 }
 
 func (handler *authHandler) Logout(responseWriter http.ResponseWriter, request *http.Request) {
+	currentSession, valid, err := sessions.Current(request, handler.accounts)
+	if err != nil {
+		handler.internalError(responseWriter, request, err)
+		return
+	}
+	if valid {
+		err = handler.accounts.RevokeSession(context.Background(), currentSession.Session.Token)
+		if err != nil {
+			handler.internalError(responseWriter, request, err)
+		}
+	}
 	challengeToken := totpLoginChallengeToken(request)
 	if err := handler.mfa.DeleteChallenge(request.Context(), challengeToken); err != nil {
 		handler.internalError(responseWriter, request, err)
