@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -96,6 +97,56 @@ func addHeaderNoSniff(next http.Handler) http.Handler {
 		w.Header().Add("X-Content-Type-Options", "nosniff")
 		next.ServeHTTP(w, r)
 	})
+}
+
+func sourceValidation(origin string, renderer *templates.Renderer) middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != "POST" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			originHeader := r.Header.Get("Origin")
+			if originHeader != "" {
+				if originHeader == origin {
+					next.ServeHTTP(w, r)
+					return
+				}
+
+				if err := httpx.RespondWithErrorPage(w, renderer, http.StatusForbidden, "Untrusted Request", "request source is missing, malformed, or untrusted"); err != nil {
+					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				}
+				return
+			}
+
+			refererHeader := r.Header.Get("Referer")
+			if refererHeader == "" {
+				if err := httpx.RespondWithErrorPage(w, renderer, http.StatusForbidden, "Untrusted Request", "request source is missing, malformed, or untrusted"); err != nil {
+					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				}
+				return
+			}
+
+			parsed, err := url.Parse(refererHeader)
+			if err != nil {
+				if err := httpx.RespondWithErrorPage(w, renderer, http.StatusForbidden, "Untrusted Request", "request source is missing, malformed, or untrusted"); err != nil {
+					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				}
+				return
+			}
+
+			parsedOrigin := parsed.Scheme + "://" + parsed.Host
+			if parsedOrigin == "://" || parsedOrigin != origin {
+				if err := httpx.RespondWithErrorPage(w, renderer, http.StatusForbidden, "Untrusted Request", "request source is missing, malformed, or untrusted"); err != nil {
+					http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				}
+				return
+			}
+
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 type rateLimitCounter struct {
