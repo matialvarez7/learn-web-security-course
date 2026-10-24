@@ -11,8 +11,8 @@ RUN apk add --no-cache ca-certificates && addgroup -S bearly && adduser -S -G be
 WORKDIR /app
 COPY --from=build /out/bearly-secure ./bearly-secure
 COPY --from=build /out/bearly-attacker-lab ./bearly-attacker-lab
-COPY attacker-lab/ ./attacker-lab/
-COPY web/ ./web/
+COPY attacker-lab ./attacker-lab
+COPY web ./web
 COPY data/uploads/mystery-shack-tax-exemption.pdf ./data/uploads/mystery-shack-tax-exemption.pdf
 RUN chown bearly:bearly ./data
 USER bearly
