@@ -7,3 +7,5 @@ data/uploads/*
 data/bulk-tax-documents/
 .env*
 !.env.example
+.agents/
+.gemini/
