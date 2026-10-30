@@ -10,7 +10,12 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-const MaxLength = 128
+const (
+	memoryKib   = 19 * 1024
+	iterations  = 2
+	parallelism = 1
+	MaxLength   = 128
+)
 
 func Hash(password string) (string, error) {
 	if utf8.RuneCountInString(password) > MaxLength {
@@ -24,9 +29,9 @@ func Hash(password string) (string, error) {
 
 	passwordHash := argon2idHash{
 		version:     argon2.Version,
-		memoryKiB:   19 * 1024,
-		iterations:  2,
-		parallelism: 1,
+		memoryKiB:   memoryKib,
+		iterations:  iterations,
+		parallelism: parallelism,
 		salt:        salt,
 		derivedKey:  derivedKey,
 	}
@@ -54,6 +59,17 @@ func Verify(password, encodedHash string) bool {
 	return subtle.ConstantTimeCompare(derivedKey, argonHash.derivedKey) == 1
 }
 
-func NeedsRehash(string) bool {
+func NeedsRehash(encodedHash string) bool {
+	_, ok := decodeLegacyHash(encodedHash)
+	if ok {
+		return true
+	}
+	argonHash, ok := parseArgon2idHash(encodedHash)
+	if !ok {
+		return false
+	}
+	if argonHash.version != argon2.Version || argonHash.memoryKiB != memoryKib || argonHash.iterations != iterations || argonHash.parallelism != parallelism || len(argonHash.derivedKey) != 32 {
+		return true
+	}
 	return false
 }
