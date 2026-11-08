@@ -265,6 +265,7 @@ func New(database *sql.DB, logger *logging.Logger, options Options) (*Applicatio
 
 	dynamicHandler := applyMiddleware(
 		dynamicMux,
+		LoadShedder(50, 1),
 		fixedWindowRateLimiter(rateLimitOptions{
 			window:  time.Minute,
 			maximum: 100,
