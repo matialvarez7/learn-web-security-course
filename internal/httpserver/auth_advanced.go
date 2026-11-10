@@ -139,6 +139,9 @@ func (handler *authHandler) TOTPLogin(responseWriter http.ResponseWriter, reques
 			"failureReason": "totp code mismatch",
 			"returnTo":      challenge.ReturnTo,
 		})
+		clientIPFunc := clientIPKeyWithTrustedProxies(handler.trustedProxyHops)
+		sourceIp := clientIPFunc(request)
+		handler.failedLogins.Record(requestID(request.Context()), sourceIp, user.ID)
 		if exhausted {
 			clearTOTPLoginChallengeCookie(responseWriter)
 			http.Redirect(responseWriter, request, verificationRestartLoginPath(challenge.ReturnTo), http.StatusFound)
@@ -292,6 +295,15 @@ func (handler *authHandler) RequestPasswordReset(responseWriter http.ResponseWri
 		handler.internalError(responseWriter, request, err)
 		return
 	}
+	var userId any
+	if found {
+		userId = user.ID
+	} else {
+		userId = nil
+	}
+	clientIPFunc := clientIPKeyWithTrustedProxies(handler.trustedProxyHops)
+	sourceIp := clientIPFunc(request)
+	handler.passwordResetRequest.Record(requestID(request.Context()), sourceIp, userId)
 	if !found {
 		handler.logAuthenticationEvent(request, "password_reset_request", map[string]any{
 			"email":         email,

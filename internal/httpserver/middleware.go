@@ -3,6 +3,7 @@
 package httpserver
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"uuid"
 
 	"github.com/bootdotdev/learn-web-security/internal/httpx"
 	"github.com/bootdotdev/learn-web-security/internal/logging"
@@ -205,6 +207,24 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-XSS-Protection", "0")
 		next.ServeHTTP(w, r)
 	})
+}
+
+type contextKey string
+
+const RequestIDKey contextKey = "request_id"
+
+func assignRequestId(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		generatedUUID := uuid.NewV4()
+		w.Header().Set("X-Request-ID", generatedUUID.String())
+		ctx := context.WithValue(r.Context(), RequestIDKey, generatedUUID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func requestID(ctx context.Context) uuid.UUID {
+	identifier, _ := ctx.Value(RequestIDKey).(uuid.UUID)
+	return identifier
 }
 
 type rateLimitCounter struct {

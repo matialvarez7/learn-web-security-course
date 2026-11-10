@@ -125,7 +125,7 @@ func New(database *sql.DB, logger *logging.Logger, options Options) (*Applicatio
 		filepath.Join(options.DataDirectory, "bulk-tax-documents"),
 		options.MaxUploadBytes,
 	)
-	authenticationHandler := newAuthHandler(accountStore, mfaStore, passwordResetStore, renderer, logger, options.AppOrigin)
+	authenticationHandler := newAuthHandler(accountStore, mfaStore, passwordResetStore, renderer, logger, options.AppOrigin, options.TrustedProxyHops)
 	passkeyHandler, err := passkeys.NewHandler(
 		options.AppOrigin,
 		accountStore,
@@ -278,6 +278,14 @@ func New(database *sql.DB, logger *logging.Logger, options Options) (*Applicatio
 	mainMux.HandleFunc("GET /health", func(responseWriter http.ResponseWriter, _ *http.Request) {
 		httpx.RespondWithJSON(responseWriter, http.StatusOK, map[string]any{"ok": true, "app": "bearly-secure"})
 	})
+	mainMux.HandleFunc("GET /.well-known/security.txt", func(responseWriter http.ResponseWriter, _ *http.Request) {
+
+		expires := time.Now().UTC().AddDate(0, 0, 180).Format(time.RFC3339)
+		content := fmt.Sprintf("Contact: mailto:security@bearlysecure.example\nPolicy: https://bearlysecure.example/security-policy\nExpires: %s", expires)
+		responseWriter.Header().Set("Content-Type", "text/plain")
+		responseWriter.WriteHeader(http.StatusOK)
+		responseWriter.Write([]byte(content))
+	})
 	staticHandler := newStaticHandler(publicRoot)
 	mainMux.Handle("GET /reset.css", staticHandler)
 	mainMux.Handle("GET /styles.css", staticHandler)
@@ -292,6 +300,7 @@ func New(database *sql.DB, logger *logging.Logger, options Options) (*Applicatio
 
 	handler := applyMiddleware(
 		mainMux,
+		assignRequestId,
 		cspNonce,
 		securityHeaders,
 		recoverPanics(logger, renderer),
